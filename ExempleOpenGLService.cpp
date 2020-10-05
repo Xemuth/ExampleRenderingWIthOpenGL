@@ -70,6 +70,11 @@ CONSOLE_APP_MAIN
 			shader.LoadFromFile("C:\\Upp\\UFEngine\\ExempleOpenGLService\\vertex.glsl",Upp::ShaderType::VERTEX);
 			shader.LoadFromFile("C:\\Upp\\UFEngine\\ExempleOpenGLService\\fragment.glsl",Upp::ShaderType::FRAGMENT);
 			shader.Link();
+		
+			shader.RegisterUniform("view");
+			shader.RegisterUniform("proj");
+			shader.RegisterUniform("model");
+			
 		}catch(Upp::Exc& e){
 			Upp::Cout() << e << Upp::EOL;
 		}
@@ -81,15 +86,34 @@ CONSOLE_APP_MAIN
 		mesh.Load();
 		
 
+		class RotationComponent : public Upp::Component{
+			public:
+				virtual Upp::String GetName(){
+					return "rotationComponent";
+				}
+				virtual void Update(double timeEllapsed, double deltaTime = 0.0){
+					float rotationAngle = glm::cos(timeEllapsed) * 0.05f;
+					glm::vec3 axisY(0,1,0);
+					GetObject().GetTransform().Rotate(rotationAngle, axisY);
+				}
+		};
+
 		
 		Upp::Object& obj = context.GetSceneManager().CreateScene("scene1").GetObjectManager().CreateObject("object1");
 		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
 		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
+		obj.GetComponentManager().CreateComponent<RotationComponent>();
+		
+		Upp::Object& camera = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera");
+		Upp::OpenGLComponentCameraPerspective& theCamera = camera.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>();
+		//camera.GetTransform().Move(0,0,0);
+		
 	
 	}catch(Upp::Exc& exc){
 		Upp::Cout() << exc << Upp::EOL;
 	}
 	
+	//context.TimerStart();
 
     while (!glfwWindowShouldClose(window))
     {
