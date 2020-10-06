@@ -205,7 +205,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
     
     for(Upp::Scene& scene : context.GetSceneManager().GetScenes()){
 		for(Upp::Object& object : scene.GetObjectManager().GetObjects()){
-			object.GetComponentManager().SendMessageToAllComponentOrInherrited<Upp::OpenGLComponentCamera>("ScreenSize",Upp::ValueArray{width,height});
+			object.GetComponentManager().SendMessageToComponent<Upp::OpenGLComponentCamera>("ScreenSize",Upp::ValueArray{width,height});
 		}
     }
 }
@@ -214,7 +214,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	for(Upp::Scene& scene : context.GetSceneManager().GetScenes()){
 		for(Upp::Object& object : scene.GetObjectManager().GetObjects()){
-			object.GetComponentManager().SendMessageToAllComponentOrInherrited<Upp::OpenGLComponentCamera>("MouseWheel",yoffset);
+			object.GetComponentManager().SendMessageToComponent<Upp::OpenGLComponentCamera>("MouseWheel",yoffset);
 		}
     }
 }
@@ -223,17 +223,20 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if(button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS){
         
-        Upp::Vector<Upp::Object*> allCamera = context.GetSceneManager().GetActiveScene().GetObjectManager().GetAllObjectDependingOnComponentOrInherritedComponent<Upp::OpenGLComponentCamera>(false);
+        //Upp::Vector<Upp::Object*> allCamera = context.GetSceneManager().GetActiveScene().GetObjectManager().GetAllObjectDependingOnComponentOrInherritedComponent<Upp::OpenGLComponentCamera>(false);
+        Upp::Vector<Upp::Object*> allCamera = context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjectsDependingOnFunction([](Upp::Object& object, Upp::Scene& scene) -> bool{
+			return object.GetComponentManager().HasComponent<Upp::OpenGLComponentCamera>();
+        });
         for(int e = 0; e < allCamera.GetCount(); e++){
-            Upp::OpenGLComponentCamera& component = allCamera[e]->GetComponentManager().GetComponentOrInherrited<Upp::OpenGLComponentCamera>(0,false);
+            Upp::OpenGLComponentCamera& component = allCamera[e]->GetComponentManager().GetComponent<Upp::OpenGLComponentCamera>();
 			if(component.IsActive()){
 				component.SetActive(false);
 				if(allCamera.GetCount() > 0){
 					try{
 						if(e + 1 < allCamera.GetCount())
-							allCamera[e + 1]->GetComponentManager().GetComponentOrInherrited<Upp::OpenGLComponentCamera>(0,false).SetActive(true);
+							allCamera[e + 1]->GetComponentManager().GetComponent<Upp::OpenGLComponentCamera>().SetActive(true);
 						else
-							allCamera[0]->GetComponentManager().GetComponentOrInherrited<Upp::OpenGLComponentCamera>(0,false).SetActive(true);
+							allCamera[0]->GetComponentManager().GetComponent<Upp::OpenGLComponentCamera>().SetActive(true);
 					}catch(Upp::Exc& exception){
 						Upp::Cout() << exception << Upp::EOL;
 					}
@@ -243,7 +246,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         }
     }else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS){
         for(Upp::Object& object : context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjects()){
-			if(object.GetComponentManager().HasComponentOrInherrited<Upp::OpenGLComponentCamera>()){
+			if(object.GetComponentManager().HasComponent<Upp::OpenGLComponentCamera>()){
 				DUMP(object);
 				return;
 			}
