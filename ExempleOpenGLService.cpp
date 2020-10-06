@@ -163,7 +163,7 @@ CONSOLE_APP_MAIN{
 		camera3.GetTransform().SetPosition(-10,0,0);
 		camera3.GetTransform().LookAt(glm::vec3(0,0,0));
 		
-		DUMP(camera2);
+		DUMP(context);
 	
 	}catch(Upp::Exc& exc){
 		Upp::Cout() << exc << Upp::EOL;
@@ -222,7 +222,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if(button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS){
-        
         //Upp::Vector<Upp::Object*> allCamera = context.GetSceneManager().GetActiveScene().GetObjectManager().GetAllObjectDependingOnComponentOrInherritedComponent<Upp::OpenGLComponentCamera>(false);
         Upp::Vector<Upp::Object*> allCamera = context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjectsDependingOnFunction([](Upp::Object& object, Upp::Scene& scene) -> bool{
 			return object.GetComponentManager().HasComponent<Upp::OpenGLComponentCamera>();
@@ -246,7 +245,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         }
     }else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS){
         for(Upp::Object& object : context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjects()){
-			if(object.GetComponentManager().HasComponent<Upp::OpenGLComponentCamera>()){
+			if(object.GetComponentManager().HasActiveComponent<Upp::OpenGLComponentCamera>()){
 				DUMP(object);
 				return;
 			}
