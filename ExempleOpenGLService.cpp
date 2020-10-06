@@ -110,7 +110,7 @@ CONSOLE_APP_MAIN{
 					return "TranslationComponent";
 				}
 				virtual void Update(double timeEllapsed, double deltaTime = 0.0){
-					GetObject().GetTransform().SetPosition(glm::vec3(0,0,glm::sin(timeEllapsed) * 10 ));
+					GetObject().GetTransform().SetPosition(glm::vec3(0,glm::cos(timeEllapsed) * 10,glm::sin(timeEllapsed) * 10 ));
 				}
 		};
 		
@@ -146,12 +146,22 @@ CONSOLE_APP_MAIN{
 		Upp::Object& camera2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera2");
 		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>(false); //We set it inactive
 		camera2.GetComponentManager().CreateComponent<LookAt>().SetTransformToLook(obj.GetTransform());
-		camera2.GetTransform().SetPosition(10,0,0);
+		//We add graphic to the Camera !
+		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
+		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
+		camera2.GetTransform().SetPosition(20,0,2);
 		
 		Upp::Object& obj2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("object2");
 		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
 		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
 		obj2.GetTransform().Move(2,0,0);
+		
+		
+		//Now we create another camera which will be inactive
+		Upp::Object& camera3 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera3");
+		camera3.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>(false); //We set it inactive
+		camera3.GetTransform().SetPosition(-10,0,0);
+		camera3.GetTransform().LookAt(glm::vec3(0,0,0));
 		
 		DUMP(camera2);
 	
@@ -212,12 +222,25 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if(button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS){
-		for(Upp::Object& object : context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjects()){
-			if(object.GetComponentManager().HasComponentOrInherrited<Upp::OpenGLComponentCamera>(false)){
-				Upp::OpenGLComponentCamera& component = object.GetComponentManager().GetComponentOrInherrited<Upp::OpenGLComponentCamera>(0,false);
-				component.SetActive(!component.IsActive());
+        
+        Upp::Vector<Upp::Object*> allCamera = context.GetSceneManager().GetActiveScene().GetObjectManager().GetAllObjectDependingOnComponentOrInherritedComponent<Upp::OpenGLComponentCamera>(false);
+        for(int e = 0; e < allCamera.GetCount(); e++){
+            Upp::OpenGLComponentCamera& component = allCamera[e]->GetComponentManager().GetComponentOrInherrited<Upp::OpenGLComponentCamera>(0,false);
+			if(component.IsActive()){
+				component.SetActive(false);
+				if(allCamera.GetCount() > 0){
+					try{
+						if(e + 1 < allCamera.GetCount())
+							allCamera[e + 1]->GetComponentManager().GetComponentOrInherrited<Upp::OpenGLComponentCamera>(0,false).SetActive(true);
+						else
+							allCamera[0]->GetComponentManager().GetComponentOrInherrited<Upp::OpenGLComponentCamera>(0,false).SetActive(true);
+					}catch(Upp::Exc& exception){
+						Upp::Cout() << exception << Upp::EOL;
+					}
+				}
+				return;
 			}
-		}
+        }
     }else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS){
         for(Upp::Object& object : context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjects()){
 			if(object.GetComponentManager().HasComponentOrInherrited<Upp::OpenGLComponentCamera>()){
