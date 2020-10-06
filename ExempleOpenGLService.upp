@@ -9,9 +9,9 @@ options(GCC WIN32) -std=c++17;
 options(MSC) /std:c++latest;
 
 file
-	ExempleOpenGLService.cpp,
 	fragment.glsl,
-	vertex.glsl;
+	vertex.glsl,
+	ExempleOpenGLService.cpp;
 
 mainconfig
 	"" = "";

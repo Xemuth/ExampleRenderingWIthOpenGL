@@ -7,6 +7,8 @@ GLFWwindow* InitialisationGLFW();
 void CheckForGLFW(GLFWwindow*);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -19,8 +21,7 @@ void GLAPIENTRY MessageCallback( GLenum source, GLenum type, GLuint id, GLenum s
 
 Upp::UFEContext context;
 
-CONSOLE_APP_MAIN
-{
+CONSOLE_APP_MAIN{
 	// glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -49,8 +50,14 @@ CONSOLE_APP_MAIN
 	    Upp::Exit(-1);
 	}
 	
+	glfwSetScrollCallback(window, scroll_callback);
+	glfwSetMouseButtonCallback(window, mouse_button_callback);
+	
 	glEnable ( GL_DEBUG_OUTPUT );
 	glDebugMessageCallback( MessageCallback, 0 );
+	
+	
+	Upp::StdLogSetup(Upp::LOG_COUT| Upp::LOG_FILE);
 	
 	//A simple triangle
 	Upp::Vector<float> verticesTriangle{
@@ -88,13 +95,39 @@ CONSOLE_APP_MAIN
 
 		class RotationComponent : public Upp::Component{
 			public:
-				virtual Upp::String GetName(){
-					return "rotationComponent";
+				virtual Upp::String GetName()const{
+					return "RotationComponent";
 				}
 				virtual void Update(double timeEllapsed, double deltaTime = 0.0){
-					float rotationAngle = glm::cos(timeEllapsed) * 0.05f;
-					glm::vec3 axisY(0,1,0);
-					GetObject().GetTransform().Rotate(rotationAngle, axisY);
+					GetObject().GetTransform().Rotate(deltaTime * 100, glm::vec3(0,1,0));
+					
+				}
+		};
+		
+		class TranslationComponent : public Upp::Component{
+			public:
+				virtual Upp::String GetName()const{
+					return "TranslationComponent";
+				}
+				virtual void Update(double timeEllapsed, double deltaTime = 0.0){
+					GetObject().GetTransform().SetPosition(glm::vec3(0,0,glm::sin(timeEllapsed) * 10 ));
+				}
+		};
+		
+		class LookAt : public Upp::Component{
+			private:
+				Upp::Transform* transformPtr = nullptr;
+			public:
+				
+				LookAt& SetTransformToLook(Upp::Transform& transform){transformPtr = &transform; return *this;}
+				
+				virtual Upp::String GetName()const{
+					return "LookAt";
+				}
+				virtual void Update(double timeEllapsed, double deltaTime = 0.0){
+					if(transformPtr){
+						GetObject().GetTransform().LookAt((*transformPtr).GetPosition());
+					}
 				}
 		};
 
@@ -103,17 +136,30 @@ CONSOLE_APP_MAIN
 		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
 		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
 		obj.GetComponentManager().CreateComponent<RotationComponent>();
-		
+		obj.GetComponentManager().CreateComponent<TranslationComponent>();
+
 		Upp::Object& camera = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera");
 		Upp::OpenGLComponentCameraPerspective& theCamera = camera.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>();
-		//camera.GetTransform().Move(0,0,0);
+		camera.GetTransform().SetPosition(0,0,5);
+
+		//Now we create another camera which will be inactive
+		Upp::Object& camera2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera2");
+		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>(false); //We set it inactive
+		camera2.GetComponentManager().CreateComponent<LookAt>().SetTransformToLook(obj.GetTransform());
+		camera2.GetTransform().SetPosition(10,0,0);
 		
+		Upp::Object& obj2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("object2");
+		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
+		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
+		obj2.GetTransform().Move(2,0,0);
+		
+		DUMP(camera2);
 	
 	}catch(Upp::Exc& exc){
 		Upp::Cout() << exc << Upp::EOL;
 	}
 	
-	//context.TimerStart();
+	context.TimerStart();
 
     while (!glfwWindowShouldClose(window))
     {
@@ -121,7 +167,11 @@ CONSOLE_APP_MAIN
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         
-        context.Update();
+        try{
+			context.Update();
+		}catch(Upp::Exc& exception){
+			Upp::Cout() << exception << Upp::EOL;
+        }
 		
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -131,21 +181,51 @@ CONSOLE_APP_MAIN
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow *window)
-{
+void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
+void framebuffer_size_callback(GLFWwindow* window, int width, int height){
     // make sure the viewport matches the new window dimensions; note that width and
     // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
+    
+    for(Upp::Scene& scene : context.GetSceneManager().GetScenes()){
+		for(Upp::Object& object : scene.GetObjectManager().GetObjects()){
+			object.GetComponentManager().SendMessageToAllComponentOrInherrited<Upp::OpenGLComponentCamera>("ScreenSize",Upp::ValueArray{width,height});
+		}
+    }
 }
 
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+	for(Upp::Scene& scene : context.GetSceneManager().GetScenes()){
+		for(Upp::Object& object : scene.GetObjectManager().GetObjects()){
+			object.GetComponentManager().SendMessageToAllComponentOrInherrited<Upp::OpenGLComponentCamera>("MouseWheel",yoffset);
+		}
+    }
+}
 
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if(button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS){
+		for(Upp::Object& object : context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjects()){
+			if(object.GetComponentManager().HasComponentOrInherrited<Upp::OpenGLComponentCamera>(false)){
+				Upp::OpenGLComponentCamera& component = object.GetComponentManager().GetComponentOrInherrited<Upp::OpenGLComponentCamera>(0,false);
+				component.SetActive(!component.IsActive());
+			}
+		}
+    }else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS){
+        for(Upp::Object& object : context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjects()){
+			if(object.GetComponentManager().HasComponentOrInherrited<Upp::OpenGLComponentCamera>()){
+				DUMP(object);
+				return;
+			}
+        }
+    }
+}
 
 
