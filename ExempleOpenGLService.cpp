@@ -110,7 +110,7 @@ CONSOLE_APP_MAIN{
 					return "TranslationComponent";
 				}
 				virtual void Update(double timeEllapsed, double deltaTime = 0.0){
-					GetObject().GetTransform().SetPosition(glm::vec3(0,glm::cos(timeEllapsed) * 10,glm::sin(timeEllapsed) * 10 ));
+					GetObject().GetTransform().SetPosition(glm::vec3(0,glm::cos(timeEllapsed) * 10,0));
 				}
 		};
 		
@@ -126,7 +126,7 @@ CONSOLE_APP_MAIN{
 				}
 				virtual void Update(double timeEllapsed, double deltaTime = 0.0){
 					if(transformPtr){
-						GetObject().GetTransform().LookAt((*transformPtr).GetPosition());
+						GetObject().GetTransform().LookAt((*transformPtr).GetPosition(),GetObject().GetTransform().GetWorldUp());
 					}
 				}
 		};
@@ -135,36 +135,30 @@ CONSOLE_APP_MAIN{
 		Upp::Object& obj = context.GetSceneManager().CreateScene("scene1").GetObjectManager().CreateObject("object1");
 		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
 		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
-		obj.GetComponentManager().CreateComponent<RotationComponent>();
 		obj.GetComponentManager().CreateComponent<TranslationComponent>();
+		obj.GetComponentManager().CreateComponent<RotationComponent>();
 
 		Upp::Object& camera = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera");
 		Upp::OpenGLComponentCameraPerspective& theCamera = camera.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>();
-		camera.GetTransform().SetPosition(0,0,5);
+		camera.GetTransform().SetPosition(-10,0,10);
+		camera.GetTransform().SetRotation(-50,glm::vec3(0,1,0));
 
 		//Now we create another camera which will be inactive
 		Upp::Object& camera2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera2");
 		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>(false); //We set it inactive
 		camera2.GetComponentManager().CreateComponent<LookAt>().SetTransformToLook(obj.GetTransform());
-		//We add graphic to the Camera !
 		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
 		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
-		camera2.GetTransform().SetPosition(20,0,2);
+		camera2.GetTransform().SetPosition(5,0,0);
+		camera2.GetTransform().SetRotation(-50,glm::vec3(0,1,0));
 		
 		Upp::Object& obj2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("object2");
 		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
 		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
-		obj2.GetTransform().Move(2,0,0);
-		
-		
-		//Now we create another camera which will be inactive
-		Upp::Object& camera3 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera3");
-		camera3.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>(false); //We set it inactive
-		camera3.GetTransform().SetPosition(-10,0,0);
-		camera3.GetTransform().LookAt(glm::vec3(0,0,0));
+		obj2.GetComponentManager().CreateComponent<RotationComponent>();
+		obj2.GetTransform().Move(10,-5,0);
 		
 		DUMP(context);
-	
 	}catch(Upp::Exc& exc){
 		Upp::Cout() << exc << Upp::EOL;
 	}
