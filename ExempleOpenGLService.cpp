@@ -18,7 +18,6 @@ void GLAPIENTRY MessageCallback( GLenum source, GLenum type, GLuint id, GLenum s
    fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),type, severity, message );
 }
 
-
 Upp::UFEContext context;
 
 CONSOLE_APP_MAIN{
@@ -70,7 +69,24 @@ CONSOLE_APP_MAIN{
 		
 		Upp::OpenGLRendererService& openGL = context.GetServiceManager().CreateService<Upp::OpenGLRendererService>();
 		
+		
+		//Both of this function are used for sending data to shader before being draw
+		//One will be executed at renderer loading (just before performing draw on every object
+		//which requier this renderer. and the other will be call at each object requiring to
+		//being draw. Allowing you to set view and projection matrix and for each object set
+		//the model matrix. It's a kind of optimisation
+		auto populateShaderWhenRenderer = [&](Upp::Renderer& renderer, Upp::OpenGLComponentCamera& camera) -> void{
+			renderer.GetShaderProgram().Bind();
+			renderer.GetShaderProgram().UniformMat4("view",camera.GetViewMatrix());
+			renderer.GetShaderProgram().UniformMat4("proj",camera.GetProjectionMatrix());
+		};
+		
+		auto populateShaderWhenMeshData = [&](Upp::Renderer& renderer, Upp::OpenGLComponentCamera& camera , Upp::Object& object) -> void{
+			renderer.GetShaderProgram().UniformMat4("model",object.GetTransform().GetModelMatrix());
+		};
+		
 		Upp::Renderer& renderer = openGL.CreateRenderer("basic");
+		renderer.beforeRendering = populateShaderWhenRenderer;
 		renderer.GenerateVAO(); //We generate the default VAO (the one corresponding to the data we passed the function above)
 		Upp::ShaderProgram& shader =  renderer.GetShaderProgram();
 		try{
@@ -92,7 +108,8 @@ CONSOLE_APP_MAIN{
 		mesh.AddMesh(verticesTriangle,normals,normals,normals); //we only use verticesTriangles for this example
 		mesh.Load();
 		
-
+		
+		
 		class RotationComponent : public Upp::Component{
 			public:
 				virtual Upp::String GetName()const{
@@ -130,11 +147,10 @@ CONSOLE_APP_MAIN{
 					}
 				}
 		};
-
 		
 		Upp::Object& obj = context.GetSceneManager().CreateScene("scene1").GetObjectManager().CreateObject("object1");
-		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
-		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
+		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().SetModel("carre");
+		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().SetRenderer("basic").SetBeforeRendering(populateShaderWhenMeshData);
 		obj.GetComponentManager().CreateComponent<TranslationComponent>();
 		obj.GetComponentManager().CreateComponent<RotationComponent>();
 
@@ -147,14 +163,13 @@ CONSOLE_APP_MAIN{
 		Upp::Object& camera2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera2");
 		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>(false); //We set it inactive
 		camera2.GetComponentManager().CreateComponent<LookAt>().SetTransformToLook(obj.GetTransform());
-		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
-		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
+		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().SetModel("carre");
+		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().SetRenderer("basic").SetBeforeRendering(populateShaderWhenMeshData);
 		camera2.GetTransform().SetPosition(5,0,0);
-		camera2.GetTransform().SetRotation(-50,glm::vec3(0,1,0));
 		
 		Upp::Object& obj2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("object2");
-		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().model = "carre";
-		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().renderer = "basic";
+		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().SetModel("carre");
+		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().SetRenderer("basic").SetBeforeRendering(populateShaderWhenMeshData);
 		obj2.GetComponentManager().CreateComponent<RotationComponent>();
 		obj2.GetTransform().Move(10,-5,0);
 		
@@ -193,10 +208,7 @@ void processInput(GLFWwindow *window){
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
 void framebuffer_size_callback(GLFWwindow* window, int width, int height){
-    // make sure the viewport matches the new window dimensions; note that width and
-    // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
-    
     for(Upp::Scene& scene : context.GetSceneManager().GetScenes()){
 		for(Upp::Object& object : scene.GetObjectManager().GetObjects()){
 			object.GetComponentManager().SendMessageToComponent<Upp::OpenGLComponentCamera>("ScreenSize",Upp::ValueArray{width,height});
@@ -208,7 +220,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	for(Upp::Scene& scene : context.GetSceneManager().GetScenes()){
 		for(Upp::Object& object : scene.GetObjectManager().GetObjects()){
-			object.GetComponentManager().SendMessageToComponent<Upp::OpenGLComponentCamera>("MouseWheel",yoffset);
+			object.GetComponentManager().SendMessageBroadcastOnlyActive("MouseWheel",yoffset);
 		}
     }
 }
@@ -216,7 +228,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if(button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS){
-        //Upp::Vector<Upp::Object*> allCamera = context.GetSceneManager().GetActiveScene().GetObjectManager().GetAllObjectDependingOnComponentOrInherritedComponent<Upp::OpenGLComponentCamera>(false);
         Upp::Vector<Upp::Object*> allCamera = context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjectsDependingOnFunction([](Upp::Object& object, Upp::Scene& scene) -> bool{
 			return object.GetComponentManager().HasComponent<Upp::OpenGLComponentCamera>();
         });
