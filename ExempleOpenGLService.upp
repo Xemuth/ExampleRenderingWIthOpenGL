@@ -2,7 +2,8 @@ uses
 	GLFW_test,
 	Core,
 	UFEngine,
-	pluginUFE/OpenGLRenderer;
+	pluginUFE/OpenGLRenderer,
+	Draw;
 
 options(GCC WIN32) -std=c++17;
 
@@ -11,6 +12,9 @@ options(MSC) /std:c++latest;
 file
 	fragment.glsl,
 	vertex.glsl,
+	fragmentTexture.glsl,
+	vertices.h,
+	Components.h,
 	ExempleOpenGLService.cpp;
 
 mainconfig

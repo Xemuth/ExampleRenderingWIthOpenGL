@@ -2,6 +2,8 @@
 #include <GLFW_test/glfw.h>
 #include <UFEngine/UFEngine.h>
 #include <pluginUFE/OpenGLRenderer/OpenGLRenderer.h>
+#include "vertices.h"
+#include "Components.h"
 
 GLFWwindow* InitialisationGLFW();
 void CheckForGLFW(GLFWwindow*);
@@ -54,34 +56,26 @@ CONSOLE_APP_MAIN{
 	
 	glEnable ( GL_DEBUG_OUTPUT );
 	glDebugMessageCallback( MessageCallback, 0 );
-	
-	
+	glEnable(GL_DEPTH_TEST); 
+
 	Upp::StdLogSetup(Upp::LOG_COUT| Upp::LOG_FILE);
 	
-	//A simple triangle
-	Upp::Vector<float> verticesTriangle{
-        -0.5f, -0.5f, 0.0f, // left
-         0.5f, -0.5f, 0.0f, // right
-         0.0f,  0.5f, 0.0f  // top
-    };
-
 	try{
 		
-		Upp::OpenGLRendererService& openGL = context.GetServiceManager().CreateService<Upp::OpenGLRendererService>();
-		
+		Upp::SGLRenderer& openGL = context.GetServiceManager().CreateService<Upp::SGLRenderer>();
 		
 		//Both of this function are used for sending data to shader before being draw
 		//One will be executed at renderer loading (just before performing draw on every object
 		//which requier this renderer. and the other will be call at each object requiring to
 		//being draw. Allowing you to set view and projection matrix and for each object set
 		//the model matrix. It's a kind of optimisation
-		auto populateShaderWhenRenderer = [&](Upp::Renderer& renderer, Upp::OpenGLComponentCamera& camera) -> void{
+		auto populateShaderWhenRenderer = [&](Upp::Renderer& renderer, Upp::CGLCamera& camera) -> void{
 			renderer.GetShaderProgram().Bind();
 			renderer.GetShaderProgram().UniformMat4("view",camera.GetViewMatrix());
 			renderer.GetShaderProgram().UniformMat4("proj",camera.GetProjectionMatrix());
 		};
 		
-		auto populateShaderWhenMeshData = [&](Upp::Renderer& renderer, Upp::OpenGLComponentCamera& camera , Upp::Object& object) -> void{
+		auto populateShaderWhenMeshData = [&](Upp::Renderer& renderer, Upp::CGLCamera& camera , Upp::Object& object) -> void{
 			renderer.GetShaderProgram().UniformMat4("model",object.GetTransform().GetModelMatrix());
 		};
 		
@@ -90,8 +84,8 @@ CONSOLE_APP_MAIN{
 		renderer.GenerateVAO(); //We generate the default VAO (the one corresponding to the data we passed the function above)
 		Upp::ShaderProgram& shader =  renderer.GetShaderProgram();
 		try{
-			shader.LoadFromFile("C:\\Upp\\UFEngine\\ExempleOpenGLService\\vertex.glsl",Upp::ShaderType::VERTEX);
-			shader.LoadFromFile("C:\\Upp\\UFEngine\\ExempleOpenGLService\\fragment.glsl",Upp::ShaderType::FRAGMENT);
+			shader.LoadFromFile("C:\\Upp\\xemuth\\Apps\\ExempleOpenGLService\\vertex.glsl",Upp::ShaderType::VERTEX);
+			shader.LoadFromFile("C:\\Upp\\xemuth\\Apps\\ExempleOpenGLService\\fragment.glsl",Upp::ShaderType::FRAGMENT);
 			shader.Link();
 		
 			shader.RegisterUniform("view");
@@ -102,76 +96,86 @@ CONSOLE_APP_MAIN{
 			Upp::Cout() << e << Upp::EOL;
 		}
 		
-		Upp::MeshData& mesh = openGL.CreateMeshData("carre");
-		Upp::Vector<float> normals;
+		
+		Upp::Renderer& rendererTexture = openGL.CreateRenderer("texture");
+		rendererTexture.beforeRendering = populateShaderWhenRenderer;
+		rendererTexture.GenerateVAO(); //We generate the default VAO (the one corresponding to the data we passed the function above)
+		Upp::ShaderProgram& shaderTexture =  rendererTexture.GetShaderProgram();
+		try{
+			shaderTexture.LoadFromFile("C:\\Upp\\xemuth\\Apps\\ExempleOpenGLService\\vertex.glsl",Upp::ShaderType::VERTEX);
+			shaderTexture.LoadFromFile("C:\\Upp\\xemuth\\Apps\\ExempleOpenGLService\\fragmentTexture.glsl",Upp::ShaderType::FRAGMENT);
+			shaderTexture.Link();
+		
+			shaderTexture.RegisterUniform("view");
+			shaderTexture.RegisterUniform("proj");
+			shaderTexture.RegisterUniform("model");
+			shaderTexture.RegisterUniform("tex");
+			shaderTexture.RegisterUniform("tex2");
+		}catch(Upp::Exc& e){
+			Upp::Cout() << e << Upp::EOL;
+		}
+		
+		
+		Upp::MeshData& mesh = openGL.CreateMeshData("triangle");
+		Upp::Vector<float> normals, texCoords;
 		normals << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0;
-		mesh.AddMesh(verticesTriangle,normals,normals,normals); //we only use verticesTriangles for this example
+		texCoords << 0.0f << 0.0f << 1.0f << 0.0f << 0.5f << 1.0f;
+		mesh.AddMesh(verticesTriangle,normals,normals,texCoords); //we only use verticesTriangles for this example
 		mesh.Load();
 		
-		
-		
-		class RotationComponent : public Upp::Component{
-			public:
-				virtual Upp::String GetName()const{
-					return "RotationComponent";
-				}
-				virtual void Update(double timeEllapsed, double deltaTime = 0.0){
-					GetObject().GetTransform().Rotate(deltaTime * 100, glm::vec3(0,1,0));
-					
-				}
-		};
-		
-		class TranslationComponent : public Upp::Component{
-			public:
-				virtual Upp::String GetName()const{
-					return "TranslationComponent";
-				}
-				virtual void Update(double timeEllapsed, double deltaTime = 0.0){
-					GetObject().GetTransform().SetPosition(glm::vec3(0,glm::cos(timeEllapsed) * 10,0));
-				}
-		};
-		
-		class LookAt : public Upp::Component{
-			private:
-				Upp::Transform* transformPtr = nullptr;
-			public:
-				
-				LookAt& SetTransformToLook(Upp::Transform& transform){transformPtr = &transform; return *this;}
-				
-				virtual Upp::String GetName()const{
-					return "LookAt";
-				}
-				virtual void Update(double timeEllapsed, double deltaTime = 0.0){
-					if(transformPtr){
-						GetObject().GetTransform().LookAt((*transformPtr).GetPosition(),GetObject().GetTransform().GetWorldUp());
-					}
-				}
-		};
-		
+		openGL.CreateMeshData("carre").AddMesh(verticesCarre,verticesCarre,verticesCarre, texCoordsCarre).Load();
+		openGL.CreateLoadTexture("wall",Upp::StreamRaster::LoadFileAny(Upp::GetFileDirectory(__FILE__) +   "wall.jpg"));
+		openGL.CreateLoadTexture("awesomeFace",Upp::StreamRaster::LoadFileAny(Upp::GetFileDirectory(__FILE__) +   "AwesomeFace.png"));
+
 		Upp::Object& obj = context.GetSceneManager().CreateScene("scene1").GetObjectManager().CreateObject("object1");
-		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().SetModel("carre");
-		obj.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().SetRenderer("basic").SetBeforeRendering(populateShaderWhenMeshData);
-		obj.GetComponentManager().CreateComponent<TranslationComponent>();
-		obj.GetComponentManager().CreateComponent<RotationComponent>();
+		obj.GetComponentManager().CreateComponent<Upp::CGLModel>().SetModel("triangle");
+		obj.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("basic").SetBeforeRendering(populateShaderWhenMeshData);
+		obj.GetComponentManager().CreateComponent<Upp::TranslationComponent>();
+		obj.GetComponentManager().CreateComponent<Upp::RotationComponent>();
 
 		Upp::Object& camera = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera");
-		Upp::OpenGLComponentCameraPerspective& theCamera = camera.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>();
-		camera.GetTransform().SetPosition(-10,0,10);
+		Upp::CGLCameraPerspective& theCamera = camera.GetComponentManager().CreateComponent<Upp::CGLCameraPerspective>();
+		camera.GetTransform().SetPosition(0,0,10);
+		
 		camera.GetTransform().SetRotation(-50,glm::vec3(0,1,0));
 
 		//Now we create another camera which will be inactive
 		Upp::Object& camera2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera2");
-		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentCameraPerspective>(false); //We set it inactive
-		camera2.GetComponentManager().CreateComponent<LookAt>().SetTransformToLook(obj.GetTransform());
-		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().SetModel("carre");
-		camera2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().SetRenderer("basic").SetBeforeRendering(populateShaderWhenMeshData);
+		camera2.GetComponentManager().CreateComponent<Upp::CGLCameraPerspective>(false); //We set it inactive
+		camera2.GetComponentManager().CreateComponent<Upp::LookAt>().SetTransformToLook(obj.GetTransform());
+		camera2.GetComponentManager().CreateComponent<Upp::CGLModel>().SetModel("triangle");
+		camera2.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("basic").SetBeforeRendering(populateShaderWhenMeshData);
 		camera2.GetTransform().SetPosition(5,0,0);
 		
 		Upp::Object& obj2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("object2");
-		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentModel>().SetModel("carre");
-		obj2.GetComponentManager().CreateComponent<Upp::OpenGLComponentRenderer>().SetRenderer("basic").SetBeforeRendering(populateShaderWhenMeshData);
-		obj2.GetComponentManager().CreateComponent<RotationComponent>();
-		obj2.GetTransform().Move(10,-5,0);
+		obj2.GetComponentManager().CreateComponent<Upp::CGLModel>().SetModel("carre");
+		
+		
+		obj2.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("texture").SetBeforeRendering(
+			[&](Upp::Renderer& renderer, Upp::CGLCamera& camera , Upp::Object& object) -> void{
+				renderer.GetShaderProgram().UniformMat4("model",object.GetTransform().GetModelMatrix());
+				if(object.GetComponentManager().HasActiveComponent<Upp::CGLTexture>()){
+					Upp::String textureToUse = object.GetComponentManager().GetComponent<Upp::CGLTexture>().texture;
+					if(openGL.GetTextures().Find(textureToUse) != -1){
+						Upp::VectorMap<int, Upp::CGLTexture*> allTextures = object.GetComponentManager().GetAllComponents<Upp::CGLTexture>();
+						char jumpValue = 0x0000;
+						for(int position : allTextures.GetKeys()){
+							glActiveTexture(GL_TEXTURE0 + jumpValue);
+							openGL.GetTextures().Get(allTextures.Get(position)->texture).Bind();
+							jumpValue += 0x0001;
+						}
+						renderer.GetShaderProgram().UniformInt("tex",0);
+						renderer.GetShaderProgram().UniformInt("tex2",1);
+					}
+				}
+			}
+		);
+		obj2.GetComponentManager().CreateComponent<Upp::RotationComponent>();
+		obj2.GetComponentManager().CreateComponent<Upp::CGLTexture>().texture = "wall";
+		obj2.GetComponentManager().CreateComponent<Upp::CGLTexture>().texture = "awesomeFace";
+		obj2.GetTransform().Move(0,0,0);
+		
+		camera.GetComponentManager().CreateComponent<Upp::LookAt>().SetTransformToLook(obj2.GetTransform());
 		
 		DUMP(context);
 	}catch(Upp::Exc& exc){
@@ -184,7 +188,7 @@ CONSOLE_APP_MAIN{
     {
         processInput(window);
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         try{
 			context.Update();
@@ -211,7 +215,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
     glViewport(0, 0, width, height);
     for(Upp::Scene& scene : context.GetSceneManager().GetScenes()){
 		for(Upp::Object& object : scene.GetObjectManager().GetObjects()){
-			object.GetComponentManager().SendMessageToComponent<Upp::OpenGLComponentCamera>("ScreenSize",Upp::ValueArray{width,height});
+			object.GetComponentManager().SendMessageToComponent<Upp::CGLCamera>("ScreenSize",Upp::ValueArray{width,height});
 		}
     }
 }
@@ -229,18 +233,18 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if(button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS){
         Upp::Vector<Upp::Object*> allCamera = context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjectsDependingOnFunction([](Upp::Object& object, Upp::Scene& scene) -> bool{
-			return object.GetComponentManager().HasComponent<Upp::OpenGLComponentCamera>();
+			return object.GetComponentManager().HasComponent<Upp::CGLCamera>();
         });
         for(int e = 0; e < allCamera.GetCount(); e++){
-            Upp::OpenGLComponentCamera& component = allCamera[e]->GetComponentManager().GetComponent<Upp::OpenGLComponentCamera>();
+            Upp::CGLCamera& component = allCamera[e]->GetComponentManager().GetComponent<Upp::CGLCamera>();
 			if(component.IsActive()){
 				component.SetActive(false);
 				if(allCamera.GetCount() > 0){
 					try{
 						if(e + 1 < allCamera.GetCount())
-							allCamera[e + 1]->GetComponentManager().GetComponent<Upp::OpenGLComponentCamera>().SetActive(true);
+							allCamera[e + 1]->GetComponentManager().GetComponent<Upp::CGLCamera>().SetActive(true);
 						else
-							allCamera[0]->GetComponentManager().GetComponent<Upp::OpenGLComponentCamera>().SetActive(true);
+							allCamera[0]->GetComponentManager().GetComponent<Upp::CGLCamera>().SetActive(true);
 					}catch(Upp::Exc& exception){
 						Upp::Cout() << exception << Upp::EOL;
 					}
@@ -250,7 +254,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         }
     }else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS){
         for(Upp::Object& object : context.GetSceneManager().GetActiveScene().GetObjectManager().GetObjects()){
-			if(object.GetComponentManager().HasActiveComponent<Upp::OpenGLComponentCamera>()){
+			if(object.GetComponentManager().HasActiveComponent<Upp::CGLCamera>()){
 				DUMP(object);
 				return;
 			}
