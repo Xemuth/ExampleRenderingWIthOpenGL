@@ -129,7 +129,8 @@ CONSOLE_APP_MAIN{
 
 		Upp::Object& obj = context.GetSceneManager().CreateScene("scene1").GetObjectManager().CreateObject("object1");
 		obj.GetComponentManager().CreateComponent<Upp::CGLModel>().SetModel("triangle");
-		obj.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("basic").SetBeforeRendering(populateShaderWhenMeshData);
+		obj.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("basic");
+		obj.GetComponentManager().CreateComponent<Upp::CGLRoutineBeforeAfterRendering>().SetBeforeRendering(populateShaderWhenMeshData);
 		obj.GetComponentManager().CreateComponent<Upp::TranslationComponent>();
 		obj.GetComponentManager().CreateComponent<Upp::RotationComponent>();
 
@@ -137,21 +138,22 @@ CONSOLE_APP_MAIN{
 		Upp::CGLCameraPerspective& theCamera = camera.GetComponentManager().CreateComponent<Upp::CGLCameraPerspective>();
 		camera.GetTransform().SetPosition(0,0,10);
 		
-		camera.GetTransform().SetRotation(-50,glm::vec3(0,1,0));
+	//	camera.GetTransform().SetRotation(-50,glm::vec3(0,1,0));
 
 		//Now we create another camera which will be inactive
 		Upp::Object& camera2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera2");
 		camera2.GetComponentManager().CreateComponent<Upp::CGLCameraPerspective>(false); //We set it inactive
 		camera2.GetComponentManager().CreateComponent<Upp::LookAt>().SetTransformToLook(obj.GetTransform());
 		camera2.GetComponentManager().CreateComponent<Upp::CGLModel>().SetModel("triangle");
-		camera2.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("basic").SetBeforeRendering(populateShaderWhenMeshData);
+		camera2.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("basic");
+		camera2.GetComponentManager().CreateComponent<Upp::CGLRoutineBeforeAfterRendering>().SetBeforeRendering(populateShaderWhenMeshData);
 		camera2.GetTransform().SetPosition(5,0,0);
 		
 		Upp::Object& obj2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("object2");
 		obj2.GetComponentManager().CreateComponent<Upp::CGLModel>().SetModel("carre");
+		obj2.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("texture");
 		
-		
-		obj2.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("texture").SetBeforeRendering(
+		obj2.GetComponentManager().CreateComponent<Upp::CGLRoutineBeforeAfterRendering>().SetBeforeRendering(
 			[&](Upp::Renderer& renderer, Upp::CGLCamera& camera , Upp::Object& object) -> void{
 				renderer.GetShaderProgram().UniformMat4("model",object.GetTransform().GetModelMatrix());
 				if(object.GetComponentManager().HasActiveComponent<Upp::CGLTexture>()){
@@ -170,12 +172,26 @@ CONSOLE_APP_MAIN{
 				}
 			}
 		);
+		
 		obj2.GetComponentManager().CreateComponent<Upp::RotationComponent>();
 		obj2.GetComponentManager().CreateComponent<Upp::CGLTexture>().texture = "wall";
 		obj2.GetComponentManager().CreateComponent<Upp::CGLTexture>().texture = "awesomeFace";
-		obj2.GetTransform().Move(0,0,0);
+
+
+		Upp::Object& skybox = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("SkyBox");
+		Upp::CGLSkyBox& sx = skybox.GetComponentManager().CreateComponent<Upp::CGLSkyBox>();
+		sx.skyboxRight = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\right.jpg");
+		sx.skyboxLeft = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\left.jpg");
+		sx.skyboxTop = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\top.jpg");
+		sx.skyboxBottom = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\bottom.jpg");
+		sx.skyboxFront = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\front.jpg");
+		sx.skyboxBack = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\back.jpg");
+		sx.LoadSkybox();
 		
-		camera.GetComponentManager().CreateComponent<Upp::LookAt>().SetTransformToLook(obj2.GetTransform());
+		//Lets now try to add Skybox to another object in the scene and see if it crash
+		//obj2.GetComponentManager().CreateComponent<Upp::CGLSkyBox>(); It work well, it raise
+		//exception because Skybox already exist
+		
 		
 		DUMP(context);
 	}catch(Upp::Exc& exc){
