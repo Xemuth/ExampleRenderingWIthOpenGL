@@ -79,7 +79,7 @@ CONSOLE_APP_MAIN{
 			renderer.GetShaderProgram().UniformMat4("model",object.GetTransform().GetModelMatrix());
 		};
 		
-		Upp::Renderer& renderer = openGL.CreateRenderer("basic");
+	/*	Upp::Renderer& renderer = openGL.CreateRenderer("basic");
 		renderer.beforeRendering = populateShaderWhenRenderer;
 		renderer.GenerateVAO(); //We generate the default VAO (the one corresponding to the data we passed the function above)
 		Upp::ShaderProgram& shader =  renderer.GetShaderProgram();
@@ -94,12 +94,13 @@ CONSOLE_APP_MAIN{
 			
 		}catch(Upp::Exc& e){
 			Upp::Cout() << e << Upp::EOL;
-		}
+		}*/
 		
 		
 		Upp::Renderer& rendererTexture = openGL.CreateRenderer("texture");
-		rendererTexture.beforeRendering = populateShaderWhenRenderer;
 		rendererTexture.GenerateVAO(); //We generate the default VAO (the one corresponding to the data we passed the function above)
+		rendererTexture.SetUniformProjectionMatrixName("proj");
+		rendererTexture.SetUniformViewMatrixName("view");
 		Upp::ShaderProgram& shaderTexture =  rendererTexture.GetShaderProgram();
 		try{
 			shaderTexture.LoadFromFile("C:\\Upp\\xemuth\\Apps\\ExempleOpenGLService\\vertex.glsl",Upp::ShaderType::VERTEX);
@@ -123,16 +124,23 @@ CONSOLE_APP_MAIN{
 		mesh.AddMesh(verticesTriangle,normals,normals,texCoords); //we only use verticesTriangles for this example
 		mesh.Load();
 		
-		openGL.CreateMeshData("carre").AddMesh(verticesCarre,verticesCarre,verticesCarre, texCoordsCarre).Load();
+		openGL.CreateMeshData("carre").AddMesh(verticesCarre,Upp::Vector<float>{},Upp::Vector<float>{}, texCoordsCarre).Load();
+		
+		
+		
+		
 		openGL.CreateLoadTexture("wall",Upp::StreamRaster::LoadFileAny(Upp::GetFileDirectory(__FILE__) +   "wall.jpg"));
 		openGL.CreateLoadTexture("awesomeFace",Upp::StreamRaster::LoadFileAny(Upp::GetFileDirectory(__FILE__) +   "AwesomeFace.png"));
 
-		Upp::Object& obj = context.GetSceneManager().CreateScene("scene1").GetObjectManager().CreateObject("object1");
+		context.GetSceneManager().CreateScene("scene1");
+
+	/*	Upp::Object& obj = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("object1");
 		obj.GetComponentManager().CreateComponent<Upp::CGLModel>().SetModel("triangle");
 		obj.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("basic");
 		obj.GetComponentManager().CreateComponent<Upp::CGLRoutineBeforeAfterRendering>().SetBeforeRendering(populateShaderWhenMeshData);
 		obj.GetComponentManager().CreateComponent<Upp::TranslationComponent>();
 		obj.GetComponentManager().CreateComponent<Upp::RotationComponent>();
+		*/
 
 		Upp::Object& camera = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera");
 		Upp::CGLCameraPerspective& theCamera = camera.GetComponentManager().CreateComponent<Upp::CGLCameraPerspective>();
@@ -141,44 +149,29 @@ CONSOLE_APP_MAIN{
 	//	camera.GetTransform().SetRotation(-50,glm::vec3(0,1,0));
 
 		//Now we create another camera which will be inactive
-		Upp::Object& camera2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera2");
+		/*Upp::Object& camera2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("camera2");
 		camera2.GetComponentManager().CreateComponent<Upp::CGLCameraPerspective>(false); //We set it inactive
 		camera2.GetComponentManager().CreateComponent<Upp::LookAt>().SetTransformToLook(obj.GetTransform());
 		camera2.GetComponentManager().CreateComponent<Upp::CGLModel>().SetModel("triangle");
 		camera2.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("basic");
 		camera2.GetComponentManager().CreateComponent<Upp::CGLRoutineBeforeAfterRendering>().SetBeforeRendering(populateShaderWhenMeshData);
-		camera2.GetTransform().SetPosition(5,0,0);
+		camera2.GetTransform().SetPosition(5,0,0);*/
 		
-		Upp::Object& obj2 = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("object2");
-		obj2.GetComponentManager().CreateComponent<Upp::CGLModel>().SetModel("carre");
-		obj2.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("texture");
+		Upp::Object& cube = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("cube");
+		cube.GetComponentManager().CreateComponent<Upp::CGLModel>().SetModel("carre");
+		cube.GetComponentManager().CreateComponent<Upp::CGLRenderer>().SetRenderer("texture").SetModelMatrixUniformName("model");
+		cube.GetComponentManager().CreateComponent<Upp::CGLTexture>().SetTexture("wall").SetChannelToUse(0).SetUniformName("tex");
+		cube.GetComponentManager().CreateComponent<Upp::CGLTexture>().SetTexture("awesomeFace").SetChannelToUse(1).SetUniformName("tex2");
+		cube.GetComponentManager().CreateComponent<Upp::RotationComponent>();
 		
-		obj2.GetComponentManager().CreateComponent<Upp::CGLRoutineBeforeAfterRendering>().SetBeforeRendering(
+		
+	/*	cube.GetComponentManager().CreateComponent<Upp::CGLRoutineBeforeAfterRendering>().SetBeforeRendering(
 			[&](Upp::Renderer& renderer, Upp::CGLCamera& camera , Upp::Object& object) -> void{
 				renderer.GetShaderProgram().UniformMat4("model",object.GetTransform().GetModelMatrix());
-				if(object.GetComponentManager().HasActiveComponent<Upp::CGLTexture>()){
-					Upp::String textureToUse = object.GetComponentManager().GetComponent<Upp::CGLTexture>().texture;
-					if(openGL.GetTextures().Find(textureToUse) != -1){
-						Upp::VectorMap<int, Upp::CGLTexture*> allTextures = object.GetComponentManager().GetAllComponents<Upp::CGLTexture>();
-						char jumpValue = 0x0000;
-						for(int position : allTextures.GetKeys()){
-							glActiveTexture(GL_TEXTURE0 + jumpValue);
-							openGL.GetTextures().Get(allTextures.Get(position)->texture).Bind();
-							jumpValue += 0x0001;
-						}
-						renderer.GetShaderProgram().UniformInt("tex",0);
-						renderer.GetShaderProgram().UniformInt("tex2",1);
-					}
-				}
 			}
-		);
-		
-		obj2.GetComponentManager().CreateComponent<Upp::RotationComponent>();
-		obj2.GetComponentManager().CreateComponent<Upp::CGLTexture>().texture = "wall";
-		obj2.GetComponentManager().CreateComponent<Upp::CGLTexture>().texture = "awesomeFace";
-
-
-		Upp::Object& skybox = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("SkyBox");
+		);*/
+				
+		/*Upp::Object& skybox = context.GetSceneManager().GetActiveScene().GetObjectManager().CreateObject("SkyBox");
 		Upp::CGLSkyBox& sx = skybox.GetComponentManager().CreateComponent<Upp::CGLSkyBox>();
 		sx.skyboxRight = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\right.jpg");
 		sx.skyboxLeft = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\left.jpg");
@@ -186,7 +179,7 @@ CONSOLE_APP_MAIN{
 		sx.skyboxBottom = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\bottom.jpg");
 		sx.skyboxFront = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\front.jpg");
 		sx.skyboxBack = Upp::StreamRaster::LoadFileAny("C:\\Upp\\upp\\bazaar\\SurfaceCtrl\\skybox\\back.jpg");
-		sx.LoadSkybox();
+		sx.LoadSkybox();*/
 		
 		//Lets now try to add Skybox to another object in the scene and see if it crash
 		//obj2.GetComponentManager().CreateComponent<Upp::CGLSkyBox>(); It work well, it raise
